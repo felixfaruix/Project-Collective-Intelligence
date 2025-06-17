@@ -1,0 +1,82 @@
+from pygame import Vector2
+from vi import Agent, Config, Simulation
+from dataclasses import dataclass
+from vi.config import Config, dataclass
+import random
+
+random.seed(13)
+
+@dataclass
+class PredPreyConfig(Config):
+    movement_speed: float = 2.0
+    radius: int = 1
+    image_rotation: bool = False
+    fps_limit: int = 60
+    duration: int = 100 * 60  
+    seed: int = 13
+    rabbit_lifespan: int = 40         #in ticks
+    fox_hunger: int = 100
+
+
+class Rabbit(Agent[PredPreyConfig]):
+    
+    #initial lifespan and random movement direction
+    def on_spawn(self,speed=1):
+        self.lifespan = self.config.rabbit_lifespan
+        angle = random.uniform(0, 360)
+        self.move = Vector2(speed, 0).rotate(angle)
+
+
+    def update(self):
+        #lifespan decreases each tick, death when lifespan=0
+        
+        self.lifespan -= 1
+        print(f'Rabbit{self.id} has a lifespan: {self.lifespan}')
+
+        if self.lifespan <= 0:
+            print(f'Rabbit {self.id} died')
+            self.kill()
+            return
+        self.change_position()
+
+        #reproduction with a probability of 0.02 (asexual)
+        if self.shared.prng_move.random() < 0.02:
+            self.reproduce()
+
+        
+class Fox(Agent[PredPreyConfig]):
+
+    #initial hunger and movement direction
+    def on_spawn(self):
+        self.hunger = 0
+        angle = random.uniform(0, 360)
+        self.move = Vector2(1, 0).rotate(angle)
+
+    def update(self):
+        self.change_position()
+        ate = False
+
+        #looking for rabbits to eat 
+        for other, dist in self.in_proximity_accuracy():
+            if isinstance(other, Rabbit) and dist == 0:
+                other.kill() #eat the rabbit
+                self.reproduce() #reproduce after eating
+                ate = True
+                break
+
+        #resetting hunger after eating, if not eaten then increment hunger
+        if ate:
+            self.hunger = 0
+        else:
+            self.hunger += 1
+
+        #death when hunger limit is reacher 
+        if self.hunger >= self.config.fox_hunger:
+            self.kill()
+
+(
+Simulation(PredPreyConfig(seed=13))
+        .batch_spawn_agents(15, Rabbit, images=['images/female_rabbit.png'])
+        .batch_spawn_agents(10, Fox,    images=['images/male_fox.png'])
+        .run()
+)
