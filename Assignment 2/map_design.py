@@ -3,10 +3,20 @@ from vi import Simulation, Config
 obstacle_size = 24
 grid = 30
 window_size = obstacle_size * grid
-obstacle_image= "images/obstacle.png"
+obstacle_image = "images/obstacle.png"
 
 
-def build_dual_corridors(sim: Simulation):
+def wall_builder (sim, r, c):
+    sim.spawn_obstacle(obstacle_image, c*obstacle_size, r*obstacle_size)
+
+def open(sim):
+    """Border walls only."""
+    for r in range(grid):
+        for c in range(grid):
+            if r in (0, grid-1) or c in (0, grid-1):
+                wall_builder(sim, r, c)
+
+def corridor(sim: Simulation):
     for r in range(grid):
         for c in range(grid):
 
@@ -24,14 +34,14 @@ def build_dual_corridors(sim: Simulation):
             walkable_path = (zone_a or zone_b or
                 corridor_upper or corridor_upper_dow or
                 corridor_lower or corridor_lower_up)
-            
+    
             if not walkable_path:
-                sim.spawn_obstacle(obstacle_image, c * obstacle_size, r *obstacle_size)
+                wall_builder(sim, r, c)
 
-if __name__ == "__main__":
 
-    cfg = Config()
-    cfg.window.width = cfg.window.height = window_size
-    sim = Simulation(cfg)
-    build_dual_corridors(sim)
-    sim.run()
+shift_map = {"open": open, "corridor": corridor}
+
+def build(sim, name: str):
+    if name not in shift_map:
+        raise ValueError(f"Unknown map '{name}'. Options: {list(shift_map)}")
+    shift_map[name](sim)

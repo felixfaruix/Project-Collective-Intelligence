@@ -1,9 +1,9 @@
 from pygame import Vector2
-from vi import Agent, Config, Simulation
+from vi import Agent, Simulation
 from dataclasses import dataclass
 from vi.config import Config, dataclass
-import random
-
+import sys, os, random
+from map_design import obstacle_size, grid, build
 random.seed(13)
 
 @dataclass
@@ -12,7 +12,7 @@ class PredPreyConfig(Config):
     radius: int = 1
     image_rotation: bool = False
     fps_limit: int = 60
-    duration: int = 100 * 60  
+    duration: int = 100 * 60
     seed: int = 13
     rabbit_lifespan: int = 40         #in ticks
     fox_hunger: int = 100
@@ -25,7 +25,7 @@ class Rabbit(Agent[PredPreyConfig]):
         self.lifespan = self.config.rabbit_lifespan
         angle = random.uniform(0, 360)
         self.move = Vector2(speed, 0).rotate(angle)
-
+        self.pos = Vector2(random.randint(4,12)* obstacle_size, random.randint(4,12)* obstacle_size)
 
     def update(self):
         #lifespan decreases each tick, death when lifespan=0
@@ -51,6 +51,7 @@ class Fox(Agent[PredPreyConfig]):
         self.hunger = 0
         angle = random.uniform(0, 360)
         self.move = Vector2(1, 0).rotate(angle)
+        self.pos = Vector2(random.randint(18,26)* obstacle_size, random.randint(18,26)* obstacle_size)
 
     def update(self):
         self.change_position()
@@ -74,9 +75,20 @@ class Fox(Agent[PredPreyConfig]):
         if self.hunger >= self.config.fox_hunger:
             self.kill()
 
-(
-Simulation(PredPreyConfig(seed=13))
-        .batch_spawn_agents(15, Rabbit, images=['images/female_rabbit.png'])
-        .batch_spawn_agents(10, Fox,    images=['images/male_fox.png'])
-        .run()
-)
+map_design = (sys.argv[1] if len(sys.argv) > 1
+       else os.getenv("MAP_DESIGN", "corridor"))
+
+cfg = PredPreyConfig(seed=13)
+cfg.window.width = cfg.window.height = obstacle_size * grid
+sim = Simulation(cfg)
+build(sim, map_design)
+
+rng = random.Random(cfg.seed)
+ri  = lambda a, b: rng.randint(a, b) * obstacle_size
+
+# Spawing the animals in their nests 
+sim.batch_spawn_agents(100, Rabbit, images=["images/rabbit.png"])
+sim.batch_spawn_agents(100, Fox, images=["images/fox.png"])
+
+print("starting sim")
+sim.run()
