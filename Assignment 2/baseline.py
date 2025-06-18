@@ -1,10 +1,15 @@
+import cProfile
+
 from pygame import Vector2
-from vi import Agent, Simulation
+from vi import Agent, HeadlessSimulation, Simulation
 from dataclasses import dataclass
 from vi.config import Config, dataclass
 import sys, os, random
 from map_design import obstacle_size, grid, build
 random.seed(13)
+from datetime import datetime
+
+from polars import DataFrame
 
 @dataclass
 class PredPreyConfig(Config):
@@ -13,9 +18,10 @@ class PredPreyConfig(Config):
     image_rotation: bool = False
     fps_limit: int = 60
     duration: int = 100 * 60
-    seed: int = 13
+    seed: int = 13 # type: ignore
     rabbit_lifespan: int = 40         #in ticks
     fox_hunger: int = 100
+    
 
 
 class Rabbit(Agent[PredPreyConfig]):
@@ -80,15 +86,20 @@ map_design = (sys.argv[1] if len(sys.argv) > 1
 
 cfg = PredPreyConfig(seed=13)
 cfg.window.width = cfg.window.height = obstacle_size * grid
-sim = Simulation(cfg)
+sim = HeadlessSimulation(cfg)
 build(sim, map_design)
 
 rng = random.Random(cfg.seed)
 ri  = lambda a, b: rng.randint(a, b) * obstacle_size
 
 # Spawing the animals in their nests 
-sim.batch_spawn_agents(100, Rabbit, images=["images/rabbit.png"])
-sim.batch_spawn_agents(100, Fox, images=["images/fox.png"])
+sim.batch_spawn_agents(20, Rabbit, images=["images/rabbit.png"])
+sim.batch_spawn_agents(20, Fox, images=["images/fox.png"])
 
 print("starting sim")
-sim.run()
+df: DataFrame = sim.run().snapshots
+
+time_label = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+df.write_csv('snapshot')
