@@ -101,4 +101,4 @@ sim.batch_spawn_agents(20, Fox, images=["images/fox.png"])
 
 df: DataFrame = sim.run().snapshots
 time_label = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-df.write_csv('snapshot')
+df.write_csv(f'snapshot_{time_label}')
