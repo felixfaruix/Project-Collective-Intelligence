@@ -1,4 +1,4 @@
-from vi import Simulation, Config
+from vi import Simulation, Config, HeadlessSimulation
 
 obstacle_size = 24
 grid = 30
