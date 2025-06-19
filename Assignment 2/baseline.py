@@ -48,6 +48,8 @@ class Rabbit(Agent[PredPreyConfig]):
         #reproduction with a probability of 0.001 (asexual)
         if self.shared.prng_move.random() < 0.001: 
             self.reproduce()
+            
+        self.save_data("Kind", "Rabbit")
 
 
 class Fox(Agent[PredPreyConfig]):
@@ -79,6 +81,8 @@ class Fox(Agent[PredPreyConfig]):
 
         if self.hunger >= self.config.fox_hunger:
             self.kill()
+            
+        self.save_data("Kind", "Fox")
 
 map_design = (sys.argv[1] if len(sys.argv) > 1
        else os.getenv("MAP_DESIGN", "corridor"))
