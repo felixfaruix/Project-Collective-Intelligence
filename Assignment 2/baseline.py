@@ -7,7 +7,7 @@ from vi.config import Config, dataclass
 import sys, os, random
 from map_design import obstacle_size, grid, build
 random.seed(13)
-import datetime
+from datetime import datetime
 from polars import DataFrame
 
 random.seed(13)
@@ -28,6 +28,7 @@ class PredPreyConfig(Config):
 
 class Rabbit(Agent[PredPreyConfig]):
     
+    
     #initial lifespan and random movement direction
     def on_spawn(self,speed=1):
         self.lifespan = self.config.rabbit_lifespan
@@ -36,6 +37,7 @@ class Rabbit(Agent[PredPreyConfig]):
         self.pos = Vector2(random.randint(4,12)* obstacle_size, random.randint(4,12)* obstacle_size)
 
     def update(self):
+        self.save_data("Kind", "Rabbit")
         #lifespan decreases each tick, death when lifespan=0
         
         self.lifespan -= 1
@@ -49,13 +51,14 @@ class Rabbit(Agent[PredPreyConfig]):
         if self.shared.prng_move.random() < 0.001: 
             self.reproduce()
             
-        self.save_data("Kind", "Rabbit")
+        
 
 
 class Fox(Agent[PredPreyConfig]):
 
     #initial hunger and movement direction
     def on_spawn(self):
+        
         self.hunger = 0
         angle = random.uniform(0, 360)
         self.move = Vector2(1, 0).rotate(angle)
@@ -63,6 +66,8 @@ class Fox(Agent[PredPreyConfig]):
 
     
     def update(self):
+        self.save_data("Kind", "Fox")
+        
         self.change_position()
         ate = False
 
@@ -82,7 +87,7 @@ class Fox(Agent[PredPreyConfig]):
         if self.hunger >= self.config.fox_hunger:
             self.kill()
             
-        self.save_data("Kind", "Fox")
+        
 
 map_design = (sys.argv[1] if len(sys.argv) > 1
        else os.getenv("MAP_DESIGN", "corridor"))
