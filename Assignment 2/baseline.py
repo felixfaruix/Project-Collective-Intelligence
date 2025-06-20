@@ -1,4 +1,5 @@
 import cProfile
+from multiprocessing import Pool
 
 from pygame import Vector2
 from vi import Agent, HeadlessSimulation, Simulation
@@ -8,7 +9,7 @@ import sys, os, random
 from map_design import obstacle_size, grid, build
 random.seed(13)
 from datetime import datetime
-from polars import DataFrame
+import polars as pl
 
 random.seed(13)
 
@@ -90,20 +91,37 @@ class Fox(Agent[PredPreyConfig]):
         
 
 map_design = (sys.argv[1] if len(sys.argv) > 1
-       else os.getenv("MAP_DESIGN", "corridor"))
+    else os.getenv("MAP_DESIGN", "corridor"))
 
-cfg = PredPreyConfig(seed=13)
-cfg.window.width = cfg.window.height = obstacle_size * grid
-sim = Simulation(cfg)
-build(sim, map_design)
+def run_simulation(seed: int) -> pl.DataFrame:
+    # build a fresh config per seed
+    cfg = PredPreyConfig(seed=seed)
+    cfg.window.width = cfg.window.height = obstacle_size * grid
 
-rng = random.Random(cfg.seed)
-ri  = lambda a, b: rng.randint(a, b) * obstacle_size
+    sim = HeadlessSimulation(cfg)           # head-less, no window[1]
+    build(sim, map_design)
 
-# Spawing the animals in their nests 
-sim.batch_spawn_agents(20, Rabbit, images=["images/rabbit.png"])
-sim.batch_spawn_agents(20, Fox, images=["images/fox.png"])
+    # spawn agents
+    sim.batch_spawn_agents(20, Rabbit, ["images/rabbit.png"])
+    sim.batch_spawn_agents(20, Fox,    ["images/fox.png"])
 
-df: DataFrame = sim.run().snapshots
-time_label = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-df.write_csv(f'snapshot_{time_label}')
+    # run and return the snapshot dataframe
+    df = sim.run().snapshots
+    # keep the seed so we know which row came from which run
+    return df.with_columns(pl.lit(seed).alias("seed"))
+
+
+if __name__ == "__main__":
+    # create a list of random seeds – here 8, change as desired
+    seeds = [random.randint(0, 1_000_000) for _ in range(20)]
+
+    # run the simulations in parallel (one core per process)
+    with Pool() as pool:                    # multiprocessing.Pool[1]
+        dfs = pool.map(run_simulation, seeds)
+
+    # concatenate all runs into one big table
+    df_all = pl.concat(dfs)
+
+    # save with timestamp
+    time_label = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    df_all.write_csv(f"snapshots_{time_label}.csv")
