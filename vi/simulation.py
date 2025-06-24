@@ -176,6 +176,7 @@ class HeadlessSimulation[ConfigClass: Config]:
     """
 
     def __init__(self, config: ConfigClass) -> None:
+        self.frame = 0 #addition
         self.config = config
         self._metrics = Metrics()
 
@@ -336,6 +337,8 @@ class HeadlessSimulation[ConfigClass: Config]:
 
     def tick(self) -> None:
         """Advance the simulation with one tick."""
+
+
         self.before_update()
 
         # Update the position of all agents
