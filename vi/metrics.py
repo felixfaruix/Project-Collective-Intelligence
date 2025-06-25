@@ -229,7 +229,7 @@ class Metrics:
         self.snapshots = pl.DataFrame()
 
     def _merge(self) -> None:
-        snapshots = pl.from_dict(self._temporary_snapshots)
+        snapshots = pl.from_dict(self._temporary_snapshots, strict=False)
 
         self.snapshots.vstack(snapshots, in_place=True)
 
