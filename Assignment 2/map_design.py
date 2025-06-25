@@ -1,111 +1,74 @@
 from vi import Simulation
-from pygame import Vector2
 
-obstacle_size = 24
-grid = 30
-window_size = obstacle_size * grid
+OB = 24
 obstacle_image = "images/obstacle.png"
-walkable_grid = [[False for _ in range(grid)] for _ in range(grid)]
 
-def wall_builder(sim, r, c):
-    sim.spawn_obstacle(obstacle_image, c * obstacle_size, r * obstacle_size)
-
-def structured_map(sim: Simulation):
-    global walkable_grid
-    walkable_grid = [[False for _ in range(grid)] for _ in range(grid)]
-
-    for r in range(grid):
-        for c in range(grid):
-            
-            zone_rabbit_male   = 2 <= r <= 5 and 2 <= c <= 5
-            zone_rabbit_female = 2 <= r <= 5 and 24 <= c <= 27
-            zone_fox_male      = 24 <= r <= 27 and 2 <= c <= 5
-            zone_fox_female    = 24 <= r <= 27 and 24 <= c <= 27
-
-            
-            corridor_rabbit_male   = 2 <= r <= 4 and 6 <= c <= 12
-            corridor_rabbit_female = 2 <= r <= 4 and 17 <= c <= 23
-            corridor_fox_male      = 24 <= r <= 26 and 6 <= c <= 12
-            corridor_fox_female    = 24 <= r <= 26 and 17 <= c <= 23
-
-            
-            vertical_corridor = 11 <= r <= 18 and 13 <= c <= 15
-
-            
-            rabbit_to_center_left  = 5 <= r <= 10 and 10 <= c <= 12
-            rabbit_to_center_right = 5 <= r <= 10 and 17 <= c <= 19
-            fox_to_center_left     = 19 <= r <= 23 and 10 <= c <= 12
-            fox_to_center_right    = 19 <= r <= 23 and 17 <= c <= 19
-
-            
-            central_open = 11 <= r <= 18 and 10 <= c <= 19
-
-            walkable = (
-                zone_rabbit_male or zone_rabbit_female or
-                zone_fox_male or zone_fox_female or
-                corridor_rabbit_male or corridor_rabbit_female or
-                corridor_fox_male or corridor_fox_female or
-                vertical_corridor or
-                rabbit_to_center_left or rabbit_to_center_right or
-                fox_to_center_left or fox_to_center_right or
-                central_open
-            )
-
-            if walkable:
-                walkable_grid[r][c] = True
-            else:
-                wall_builder(sim, r, c)
+GRID = 30
 
 
-def corridor(sim: Simulation):
-    for r in range(grid):
-        for c in range(grid):
-            zone_rabbit_male   = 3 <= r <= 6 and 3 <= c <= 6
-            zone_rabbit_female = 3 <= r <= 6 and 23 <= c <= 26
-            zone_fox_male      = 23 <= r <= 26 and 3 <= c <= 6
-            zone_fox_female    = 23 <= r <= 26 and 23 <= c <= 26
+def wall(sim: Simulation, r: int, c: int) -> None:
+    sim.spawn_obstacle(obstacle_image, c * OB, r * OB)
 
-            corridor_rabbit_male   = 4 <= r <= 5 and 7 <= c <= 13
-            corridor_rabbit_female = 4 <= r <= 5 and 16 <= c <= 22
-            corridor_fox_male      = 24 <= r <= 25 and 7 <= c <= 13
-            corridor_fox_female    = 24 <= r <= 25 and 16 <= c <= 22
-            central_corridor       = 5 <= r <= 24 and 13 <= c <= 16
 
-            walkable_path = (
-                zone_rabbit_male or zone_rabbit_female or
-                zone_fox_male or zone_fox_female or
-                corridor_rabbit_male or corridor_rabbit_female or
-                corridor_fox_male or corridor_fox_female or
-                central_corridor
-            )
+NEST = 8
+HUB  = 12
+CORR = 3
 
-            if not walkable_path:
-                wall_builder(sim, r, c)
-            else:
-                walkable_grid[r][c] = True
+# convenient indices
+tl = 1                       # nests start at row/col 1
+br = GRID - NEST - 1         # bottom/right nest top-left = 21 (for 30×30)
+hub_r0 = (GRID - HUB) // 2   # 9
+hub_r1 = hub_r0 + HUB - 1    # 20
+hub_c0 = hub_r0              # centred square
+hub_c1 = hub_r1
 
-def open(sim):
-    for r in range(grid):
-        for c in range(grid):
-            if r in (0, grid-1) or c in (0, grid-1):
-                wall_builder(sim, r, c)
+# corridor spans
+top_rows    = range(hub_r0 - CORR, hub_r0)          # 6-8
+bottom_rows = range(hub_r1 + 1, hub_r1 + 1 + CORR)  # 21-23
+left_cols   = range(hub_c0 - CORR, hub_c0)          # 6-8
+right_cols  = range(hub_c1 + 1, hub_c1 + 1 + CORR)  # 21-23
 
-shift_map = {"open": open, "corridor": corridor, "structured": structured_map}
+# ───────────────── map builders ────────────────
+def hub_map(sim: Simulation):
+    """Build the 4-nests-plus-hub map."""
+    for r in range(GRID):
+        for c in range(GRID):
 
-def build(sim, name: str):
-    if name not in shift_map:
-        raise ValueError(f"Unknown map '{name}'. Options: {list(shift_map)}")
-    shift_map[name](sim)
+            # 8×8 nests
+            in_tl = tl <= r < tl + NEST and tl <= c < tl + NEST
+            in_tr = tl <= r < tl + NEST and br <= c < br + NEST
+            in_bl = br <= r < br + NEST and tl <= c < tl + NEST
+            in_br = br <= r < br + NEST and br <= c < br + NEST
 
-def is_walkable_at(pos: Vector2) -> bool:
-    row = int(pos.y // obstacle_size)
-    col = int(pos.x // obstacle_size)
-    return (
-        0 <= row < grid and
-        0 <= col < grid and
-        walkable_grid[row][col]
-    )
+            # 12×12 hub
+            in_hub = hub_r0 <= r <= hub_r1 and hub_c0 <= c <= hub_c1
 
-def print_walkable_grid():
-    for r in range(grid):
-        print("".join("." if walkable_grid[r][c] else "#" for c in range(grid)))
+            # 3-tile corridors
+            in_top    = r in top_rows    and hub_c0 <= c <= hub_c1
+            in_bottom = r in bottom_rows and hub_c0 <= c <= hub_c1
+            in_left   = c in left_cols   and hub_r0 <= r <= hub_r1
+            in_right  = c in right_cols  and hub_r0 <= r <= hub_r1
+
+            walkable = in_tl or in_tr or in_bl or in_br or \
+                       in_hub or in_top or in_bottom or in_left or in_right
+
+            if not walkable:
+                wall(sim, r, c)
+
+# ───────────────── spawn lists (inner 6×6 cores) ─────────────────
+core_rng_tl = range(tl + 1, tl + 1 + 6)         # 2-7
+core_rng_br = range(br + 1, br + 1 + 6)         # 22-27
+
+nest_top_left     = [(r, c) for r in core_rng_tl for c in core_rng_tl]
+nest_top_right    = [(r, c) for r in core_rng_tl for c in core_rng_br]
+nest_bottom_left  = [(r, c) for r in core_rng_br for c in core_rng_tl]
+nest_bottom_right = [(r, c) for r in core_rng_br for c in core_rng_br]
+
+all_nests = (nest_top_left + nest_top_right +
+             nest_bottom_left + nest_bottom_right)
+
+# ───────────────── external API ─────────────────
+def build(sim: Simulation, name: str):
+    if name != "corridor":
+        raise ValueError("Only 'corridor' is implemented in this simple map")
+    hub_map(sim)

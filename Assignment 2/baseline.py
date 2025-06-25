@@ -4,11 +4,29 @@ from pygame import Vector2
 from vi import Agent, HeadlessSimulation, Simulation
 from dataclasses import dataclass
 from vi.config import Config, dataclass
-from pygame import Vector2
-import random
-from map_design import obstacle_size, grid, build, is_walkable_at, print_walkable_grid
+import sys, os, random
+from map_design import OB as obstacle_size, GRID as grid, build, nest_top_left as RABBIT_F_NESTS, nest_bottom_right as RABBIT_M_NESTS, nest_bottom_left as FOX_M_NESTS, nest_top_right as FOX_F_NESTS, all_nests
+from datetime import datetime
+from datetime import datetime
+import polars as pl
 
 random.seed(13)
+
+def age_to_speed(v_min, v_max, age, max_age):
+    urgency = 1 - (age / max_age)
+    return v_min + (urgency ** 2) * (v_max - v_min)
+
+def make_rabbit(sex: str, pool):
+    class R(Rabbit):
+        fixed_sex = sex
+        spawn_pool = pool
+    return R
+
+def make_fox(sex: str, pool):
+    class F(Fox):
+        fixed_sex = sex
+        spawn_pool = pool
+    return F
 
 @dataclass
 class PredPreyConfig(Config):
@@ -19,91 +37,33 @@ class PredPreyConfig(Config):
     fps_limit: int = 60
     duration: int = 100 * 60
     seed: int = 13
-    rabbit_lifespan: int = 200
-    fox_lifespan: int = 200
+    rabbit_lifespan: int = 2000
+    fox_lifespan: int = 1000
     fox_food_gain: int = 50
 
-nest_top_left = [(x, y) for x in range(1, 3) for y in range(1, 3)]
-nest_top_right = [(x, y) for x in range(grid - 3, grid - 1) for y in range(1, 3)]
-nest_bottom_left = [(x, y) for x in range(1, 3) for y in range(grid - 3, grid - 1)]
-nest_bottom_right = [(x, y) for x in range(grid - 3, grid - 1) for y in range(grid - 3, grid - 1)]
-all_nests = nest_top_left + nest_top_right + nest_bottom_left + nest_bottom_right
-
-def attempt_move(agent, speed):
-    future_pos = agent.pos + agent.move
-    if is_walkable_at(future_pos):
-        agent.pos = future_pos
-        return
-    for _ in range(5):
-        angle = random.uniform(0, 360)
-        trial_move = Vector2(1, 0).rotate(angle).normalize() * speed
-        if is_walkable_at(agent.pos + trial_move):
-            agent.move = trial_move
-            agent.pos += trial_move
-            return
-    agent.move = Vector2()
-
 class Rabbit(Agent[PredPreyConfig]):
+    fixed_sex = None
+    spawn_pool = []
+
     def on_spawn(self, speed=1):
-        self._my_id = id(self)
+        r, c = random.choice(self.spawn_pool)
+        self.sex = self.fixed_sex
+        self.pos = Vector2(c * obstacle_size, r * obstacle_size)
         self.max_lifespan = self.config.rabbit_lifespan
         self.lifespan = self.max_lifespan
-        self.sex = random.choice(["M", "F"])
-        self.image_index = getattr(self, "image_index", -1)
-
-        # Assign to sex-based nest
-        if self.sex == "M":
-            tile_x, tile_y = random.choice(nest_top_left)
-        else:
-            tile_x, tile_y = random.choice(nest_top_right)
-
-        self.pos = Vector2(tile_x * obstacle_size, tile_y * obstacle_size)
-        self.nest_pos = self.pos
-        self.returning_to_nest = False
+        self.move = Vector2(1, 0).rotate(random.uniform(0, 360))
         self._still_stuck = False
-        angle = random.uniform(0, 360)
-        self.move = Vector2(speed, 0).rotate(angle)
-
 
     def update(self):
-        self.save_data("frame", self.shared.counter)
-
-        self.save_data("id", self._my_id)
-
-        self.save_data("Kind", "Rabbit")
-        self.save_data("Sex", getattr(self, "sex", "?"))
-        self.save_data("Lifespan", getattr(self, "lifespan", -1))
-        self.save_data("x", self.pos.x)
-        self.save_data("y", self.pos.y)
-        self.save_data("image_index", getattr(self, "image_index", -1))
-
-
-
-
         self.lifespan -= 1
         if self.lifespan <= 0:
             self.kill()
             return
-        
-        urgency = 1 - (self.lifespan / self.max_lifespan)
-        speed = self.config.v_min + urgency * (self.config.v_max - self.config.v_min)
 
-        if self.returning_to_nest:
-            to_nest = self.nest_pos - self.pos
-            if to_nest.length() < 3:
-                self.returning_to_nest = False
-            else:
-                self.move = (0.7 * to_nest.normalize() + 0.3 * self.move).normalize()
-
-        elif self.shared.prng_move.random() < 0.01 + (1 - urgency) * 0.05:
-            angle = random.uniform(0, 360)
-            self.move = Vector2(1, 0).rotate(angle)
-
-        if self.move.length() == 0:
-           self.move = Vector2(1, 0).rotate(random.uniform(0, 360))
-
-        self.move = self.move.normalize() * speed
-        attempt_move(self, speed)
+        speed = age_to_speed(self.config.v_min, self.config.v_max, self.lifespan, self.max_lifespan)
+        if self.move.length() > 0:
+            self.move = self.move.normalize() * speed
+        self.change_position()
 
         for other in self.in_proximity_performance():
             if isinstance(other, Rabbit) and other.sex != self.sex:
@@ -112,51 +72,31 @@ class Rabbit(Agent[PredPreyConfig]):
                     prob = urgency ** 2
                     if self.shared.prng_move.random() < prob:
                         self.reproduce()
-                        self.returning_to_nest = True
-                        break
-
+                    break
 
 class Fox(Agent[PredPreyConfig]):
+    fixed_sex = None
+    spawn_pool = []
+
     def on_spawn(self):
-        self._my_id = id(self)
+        r, c = random.choice(self.spawn_pool)
+        self.sex = self.fixed_sex
+        self.pos = Vector2(c * obstacle_size, r * obstacle_size)
         self.max_lifespan = self.config.fox_lifespan
         self.lifespan = self.max_lifespan
-        self.sex = random.choice(["M", "F"])
-        self.image_index = getattr(self, "image_index", -1)
-
-
-        tile_x, tile_y = random.choice(nest_bottom_left if self.sex == "M" else nest_bottom_right)
-        self.pos = Vector2(tile_x * obstacle_size, tile_y * obstacle_size)
-
-        angle = random.uniform(0, 360)
-        self.move = Vector2(1, 0).rotate(angle)
+        self.move = Vector2(1, 0).rotate(random.uniform(0, 360))
         self._still_stuck = False
 
     def update(self):
-
-        self.save_data("frame", self.shared.counter)
-
-        self.save_data("id", self._my_id)
-
-        self.save_data("Kind", "Fox")
-        self.save_data("Sex", getattr(self, "sex", "?"))
-        self.save_data("Lifespan", getattr(self, "lifespan", -1))
-        self.save_data("x", self.pos.x)
-        self.save_data("y", self.pos.y)
-        self.save_data("image_index", getattr(self, "image_index", -1))
-
-
-
         self.lifespan -= 1
         if self.lifespan <= 0:
             self.kill()
             return
 
-        speed = self.config.v_min + (1 - (self.lifespan / self.max_lifespan)) * (self.config.v_max - self.config.v_min)
+        speed = age_to_speed(self.config.v_min, self.config.v_max, self.lifespan, self.max_lifespan)
         if self.move.length() > 0:
             self.move = self.move.normalize() * speed
-
-        attempt_move(self, speed)
+        self.change_position()
 
         for other in self.in_proximity_performance():
             if isinstance(other, Rabbit):
@@ -171,14 +111,17 @@ class Fox(Agent[PredPreyConfig]):
                     prob = urgency ** 2
                     if self.shared.prng_move.random() < prob:
                         self.reproduce()
-                        break
+                    break
 
 if __name__ == "__main__":
     cfg = PredPreyConfig(seed=13)
     cfg.window.width = cfg.window.height = obstacle_size * grid
     sim = Simulation(cfg)
-    build(sim, "structured")
-    print_walkable_grid()
-    sim.batch_spawn_agents(70, Rabbit, images=["images/rabbit.png"])
-    sim.batch_spawn_agents(50, Fox, images=["images/fox.png"])
+    build(sim, "corridor")
+
+    sim.batch_spawn_agents(20, make_rabbit("F", RABBIT_F_NESTS), images=["images/rabbit.png"])
+    sim.batch_spawn_agents(20, make_rabbit("M", RABBIT_M_NESTS), images=["images/rabbit.png"])
+    sim.batch_spawn_agents(20, make_fox("M", FOX_M_NESTS), images=["images/fox.png"])
+    sim.batch_spawn_agents(20, make_fox("F", FOX_F_NESTS), images=["images/fox.png"])
+
     sim.run()
