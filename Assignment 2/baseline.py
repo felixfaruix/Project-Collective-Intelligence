@@ -5,6 +5,7 @@ from vi import Agent, HeadlessSimulation, Simulation
 from dataclasses import dataclass
 from vi.config import Config, dataclass
 from pygame import Vector2
+import random
 from map_design import obstacle_size, grid, build, is_walkable_at, print_walkable_grid
 
 random.seed(13)
@@ -49,7 +50,6 @@ class Rabbit(Agent[PredPreyConfig]):
         self.lifespan = self.max_lifespan
         self.sex = random.choice(["M", "F"])
         self.image_index = getattr(self, "image_index", -1)
-
 
         # Assign to sex-based nest
         if self.sex == "M":
