@@ -1,6 +1,5 @@
 import cProfile
 from multiprocessing import Pool
-
 from pygame import Vector2
 from vi import Agent, HeadlessSimulation, Simulation
 from dataclasses import dataclass
