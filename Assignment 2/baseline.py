@@ -117,7 +117,11 @@ def inside_rabbit_nest_cell(pos: Vector2) -> bool:
     r, c = int(pos.y // CELL), int(pos.x // CELL)
     return (r, c) in RABBIT_NEST_CELLS
 
+<<<<<<< Updated upstream
 HOME_FACTOR = 25
+=======
+HOME_FACTOR = 40
+>>>>>>> Stashed changes
 FAR_CELLS   = 15
 TL_CENTER   = Vector2((tl + NEST/2)*CELL, (tl + NEST/2)*CELL)
 BR_CENTER   = Vector2((br + NEST/2)*CELL, (br + NEST/2)*CELL)
@@ -155,14 +159,21 @@ class Rabbit(Agent[PredPreyConfig]):
     def update(self):
         self.life -= 1
         if self.life <= 0:
+<<<<<<< Updated upstream
             self._log(kill=0, mated=0)
             self.kill(); return
+=======
+            self._log(kill=0, mated=0)  # ← add this
+            self.kill()
+            return
+>>>>>>> Stashed changes
         self._steer()
         speed = age_to_speed(self.config.v_min, self.config.v_max,
                              self.life, self.max_life)
         if self.move.length(): self.move = self.move.normalize()*speed
         self.change_position()
         if on_grass(self):
+<<<<<<< Updated upstream
             self.life = min(self.life + self.config.rabbit_food_gain,
                             self.max_life)
         # mating attempt
@@ -173,8 +184,33 @@ class Rabbit(Agent[PredPreyConfig]):
                    and self.pos.distance_to(other.pos)==0:
                     if self.shared.prng_move.random() < (1-self.life/self.max_life)**2:
                         self.reproduce(); mated = 1; self._decide()
+=======
+            self.life = min(self.life + self.config.rabbit_food_gain, self.max_life)
+
+        mated = 0  # ← define this
+
+        if not on_rabbit_nest(self):
+            for other in self.in_proximity_performance():
+                if isinstance(other, Rabbit) and other.sex != self.sex and self.pos.distance_to(other.pos) < self.config.radius:
+                    urg = 1 - self.life / self.max_life
+                    if self.shared.prng_move.random() < 0.40 + 0.60 * urg:
+                        self.reproduce()
+                        mated = 1
+                        self._decide()
+>>>>>>> Stashed changes
                     break
         self._log(kill=0, mated=mated)
+    # metrics
+    def _log(self, *, kill:int, mated:int):
+        self.save_data("kind",  "rabbit")
+        self.save_data("sex",   self.sex)
+        self.save_data("life_left", self.life)
+        self.save_data("on_nest",   on_rabbit_nest(self))
+        self.save_data("kill",  kill)
+        self.save_data("mated", mated)
+
+        self._log(kill=0, mated=mated)  # ← now this gets logged correctly
+
     # metrics
     def _log(self, *, kill:int, mated:int):
         self.save_data("kind",  "rabbit")
@@ -219,10 +255,16 @@ class Fox(Agent[PredPreyConfig]):
                 break
         mated = 0
         for other in self.in_proximity_performance():
+<<<<<<< Updated upstream
             if isinstance(other, Fox) and other.sex!=self.sex \
                and self.pos.distance_to(other.pos)==0:
                 if self.shared.prng_move.random() < (1-self.life/self.max_life)**2:
                     self.reproduce(); mated = 1
+=======
+            if isinstance(other, Fox) and other.sex != self.sex and self.pos.distance_to(other.pos) == 0:
+                if self.shared.prng_move.random() < (1 - self.life / self.max_life)**2:
+                    self.reproduce()
+>>>>>>> Stashed changes
                 break
         self._log(kill=kill, mated=mated)
     def _log(self, *, kill:int, mated:int):
@@ -233,6 +275,17 @@ class Fox(Agent[PredPreyConfig]):
         self.save_data("kill",  kill)
         self.save_data("mated", mated)
 
+<<<<<<< Updated upstream
+=======
+    def _log(self, *, kill:int, mated:int):
+        self.save_data("kind",  "fox")
+        self.save_data("sex",   self.sex)
+        self.save_data("life_left", self.life)
+        self.save_data("on_nest", False)
+        self.save_data("kill",  kill)
+        self.save_data("mated", mated)
+
+>>>>>>> Stashed changes
 # factories
 def make_rabbit(sex, pool):
     class R(Rabbit): fixed_sex=sex; spawn_pool=pool
@@ -260,15 +313,25 @@ if __name__ == "__main__":
                            images=["images/rabbit.png"])
     sim.batch_spawn_agents(20, make_rabbit("M", RABBIT_M_NESTS),
                            images=["images/rabbit.png"])
+<<<<<<< Updated upstream
     sim.batch_spawn_agents(20, make_fox("M", FOX_M_NESTS),
                            images=["images/fox.png"])
     sim.batch_spawn_agents(20, make_fox("F", FOX_F_NESTS),
+=======
+    sim.batch_spawn_agents(10, make_fox("M", FOX_M_NESTS),
+                           images=["images/fox.png"])
+    sim.batch_spawn_agents(10, make_fox("F", FOX_F_NESTS),
+>>>>>>> Stashed changes
                            images=["images/fox.png"])
 
     result = sim.run()
     df = result.snapshots
 
+<<<<<<< Updated upstream
     base = Path(f"predprey_seed_{cfg.seed}")
+=======
+    base = Path(f"predprey_seed_{cfg.seed}_home40")
+>>>>>>> Stashed changes
     df.write_csv(base.with_suffix(".csv"))
     run_info = {
         "seed":            cfg.seed,
