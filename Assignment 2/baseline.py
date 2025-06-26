@@ -177,7 +177,7 @@ class Rabbit(Agent[PredPreyConfig]):
                         self._decide()
                     break
         self._log(kill=0, mated=mated)
-        
+
     # metrics
     def _log(self, *, kill:int, mated:int):
         self.save_data("kind",  "rabbit")
