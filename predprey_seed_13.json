@@ -1,0 +1,9 @@
+{
+  "seed": 13,
+  "grass_patches": 6,
+  "HOME_FACTOR": 25,
+  "v_min": 1.0,
+  "v_max": 3.0,
+  "rabbit_lifespan": 2000,
+  "duration_ticks": 6000
+}
