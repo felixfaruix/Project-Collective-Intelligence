@@ -1,6 +1,7 @@
+import argparse
 import random
 from pygame import Vector2
-from vi import Agent, Simulation
+from vi import Agent, Simulation, HeadlessSimulation
 from vi.config import Config, dataclass
 from map_design import (
     build,
@@ -12,6 +13,13 @@ from map_design import (
     nest_bottom_left  as FOX_M_NESTS,
     nest_top_right    as FOX_F_NESTS,
 )
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--headless",
+    action="store_true",
+    help="Run the simulation in headless mode (no GUI)."
+)
+args = parser.parse_args()
 
 NEST_IMG  = "images/rabbit_nest.png"
 GRASS_IMG = "images/grass.png"
@@ -223,12 +231,21 @@ if __name__ == "__main__":
 
     cfg = PredPreyConfig(seed=13)
     cfg.window.width = cfg.window.height = CELL * GRID
-    sim = Simulation(cfg)
+    if args.headless:
+        sim = HeadlessSimulation(cfg)
+    else:    
+        sim = Simulation(cfg)
 
-    build(sim, "corridor")
-    spawn_sites(sim)
+    build(sim, "corridor") # type: ignore
+    spawn_sites(sim) # type: ignore
     sim.batch_spawn_agents(20, make_rabbit("F", RABBIT_F_NESTS), images=["images/rabbit.png"])
     sim.batch_spawn_agents(20, make_rabbit("M", RABBIT_M_NESTS), images=["images/rabbit.png"])
     sim.batch_spawn_agents(20, make_fox("M", FOX_M_NESTS), images=["images/fox.png"])
     sim.batch_spawn_agents(20, make_fox("F", FOX_F_NESTS), images=["images/fox.png"])
-    sim.run()
+    
+    if not args.headless:
+        sim.run()
+    else:
+        data = sim.run().snapshots
+    
+    
